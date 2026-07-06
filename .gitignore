@@ -1,0 +1,12 @@
+# OS cruft
+.DS_Store
+
+# build outputs (native per-platform dirs + generated wasm artifacts;
+# web/traveller.html is hand-maintained and stays tracked)
+bin-*/
+web/traveller.js
+web/traveller.wasm
+web/traveller.data
+
+# -dump N render-verification frames
+traveller_gen_*.bmp
