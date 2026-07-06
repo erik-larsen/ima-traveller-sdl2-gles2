@@ -21,11 +21,12 @@ decompilation.  Source comments reference the original's function addresses
 
 ## Build & run
 
-Prerequisites (siblings of this repo): freeglut-sdl2-ogles2 built with
-`-DFREEGLUT_SDL2_GL4ES=ON` (`../freeglut-sdl2-ogles2/build`, `build-web`),
-gl4es (`../gl4es`), and on Mac/Windows ANGLE (`../opengl-for-mac`) — the
-same setup the newave demo uses.  Override the tree locations via make
-variables (see the Makefile).
+All headers and prebuilt libs (freeglut-sdl2-ogles2, gl4es, ANGLE) are
+vendored under `deps/` — see [deps/README.md](deps/README.md) for provenance
+and `./deps/refresh.sh` to re-vendor from sibling source trees.  The only
+external requirements are SDL2 for native builds (`brew install sdl2`) and
+emcc for web builds.  Every dep path is a `?=` make variable, so external
+trees can still be swapped in.
 
 ```sh
 make            # native -> ./bin-<os>-<arch>/traveller
@@ -42,7 +43,7 @@ make selftest   # headless CA core check
   sets, swapped every generation.
 - Each frame draws the tile grid as `GL_TRIANGLE_STRIP` quads (immediate mode,
   identity projection/modelview) over an NDC rectangle that grows by
-  `2^(1/frames_per_generation)` per frame — a seamless 2x zoom per generation,
+  `2^(1/frames_per_generation)` per frame — an almost seamless 2x zoom per generation,
   panning toward the mouse-driven focus point.
 - Evolution is **amortized**: `speed` (1..4) selects 1/2/4/8 CA rows evolved per
   displayed frame; when the generation completes, the new image is uploaded one
