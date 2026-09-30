@@ -129,3 +129,23 @@ Both print identical per-generation CRC32s of the CA buffer (verified for
   warping, which the web cannot do).
 - The original was single-buffer capable (`doublebuffer no` + `glFinish`);
   this port always double-buffers.
+
+## Credits
+
+**IMA Traveller** (traveller 2.0c, 1996) is an artwork by
+[Erwin Driessens & Maria Verstappen](https://www.driessensverstappen.nl/expanding-structures/ima-traveller/ima-traveller.html).
+All rights in the original work remain with the artists.  This is an
+unofficial, non-commercial port; the original executable is not included.
+
+Port by [Erik Larsen](https://github.com/erik-larsen).
+
+Vendored libraries (see [deps/README.md](deps/README.md)):
+
+| Library | License | Notice |
+|---------|---------|--------|
+| [freeglut](https://github.com/sgi-demos/freeglut) (SDL2 + GLES2 fork) | MIT/X11 | [deps/freeglut/COPYING](deps/freeglut/COPYING) |
+| [gl4es](https://github.com/ptitSeb/gl4es) | MIT | [deps/gl4es/LICENSE](deps/gl4es/LICENSE) |
+| [ANGLE](https://chromium.googlesource.com/angle/angle) | BSD 3-clause | [deps/angle/LICENSE](deps/angle/LICENSE) |
+
+Also built on [SDL2](https://www.libsdl.org) (zlib license; system or
+Emscripten port, not vendored) and [Emscripten](https://emscripten.org).

@@ -18,10 +18,12 @@ mkdir -p freeglut/include freeglut/lib/native freeglut/lib/web \
          gl4es/lib angle/lib-mac-arm64
 
 cp -R "$FREEGLUT/include/." freeglut/include/
+cp "$FREEGLUT/COPYING" freeglut/
 cp "$FREEGLUT/build/lib/libglut.a"     freeglut/lib/native/
 cp "$FREEGLUT/build-web/lib/libglut.a" freeglut/lib/web/
 
 cp -R "$GL4ES/include/." gl4es/include/
+cp "$GL4ES/LICENSE" gl4es/
 cp "$GL4ES/lib/libGL-native.a" "$GL4ES/lib/libGL-web.a" gl4es/lib/
 
 cp "$OGL_FOR_MAC/lib/libGLESv2.dylib" "$OGL_FOR_MAC/lib/libEGL.dylib" \

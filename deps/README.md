@@ -15,5 +15,9 @@ The ANGLE dylibs are mac-arm64 only. On Linux, GLES2/EGL usually come from
 the system (Mesa) — point the build at them with
 `make GLES_LIBS_PATH=/usr/lib/...`; on Windows use ANGLE DLLs the same way.
 
+Each dir carries its upstream license (`freeglut/COPYING`,
+`gl4es/LICENSE`, `angle/LICENSE`), which must travel with any build that
+links these libraries.
+
 To re-vendor after rebuilding the source trees (siblings of this repo by
 default): `./refresh.sh`
