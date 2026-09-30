@@ -29,8 +29,6 @@
  *                      # | ULTRA (2048x1536) | ULTRA2 (2560x2048) (port ext.)
  *     xres 640         # window width: 640 | 800 | 1024
  *     fullscreen no
- *     intro yes        # port ext.: compress the first ~10 near-black
- *                      # generations while the seed grows to full screen
  *
  * Command line (port extensions):  -seed N   fixed RNG seed (default time(0))
  *                                  -trial    exit after 101 generations, as the
@@ -50,6 +48,9 @@
 #include <time.h>
 #include <GL/glut.h>
 #include <SDL.h>
+#ifdef __EMSCRIPTEN__
+#include <emscripten/html5.h>
+#endif
 
 #include "ima_core.h"
 
@@ -95,16 +96,6 @@ static int cfg_fullscreen = 0;
  * ~2x zoom per 2.2 s. */
 static int cfg_detail_set = 0;
 static int cfg_speed_set  = 0;
-
-/* Fast intro (port extension, config "intro no" disables): from a 4-pixel
- * seed the screen stays near-black for the first ~10 generations; run those
- * compressed (few frames each, all tiles uploaded in one frame) and settle
- * into the normal cadence as the structure reaches full screen.  The zoom
- * stays seamless: zoomf = 2^(1/n) adapts to the shorter generation. */
-static int cfg_intro = 1;
-#define INTRO_CYCLES 10
-#define INTRO_CHUNKS 8
-static int gen_boost = 0;          /* this generation runs compressed */
 
 static unsigned int rng_seed;    /* ima this[16]: time(0) unless -seed     */
 static int opt_trial = 0;        /* original quit-after-101-cycles gate    */
@@ -152,7 +143,10 @@ static Uint64 stat_min = ~(Uint64)0, stat_max = 0, stat_frames = 0;
 static double stat_start;
 
 /* ---- input ------------------------------------------------------------- */
-static int mouse_x, mouse_y;
+static int mouse_x, mouse_y;       /* last pointer position (drawable px)  */
+static int steer_live = 0;         /* pointer has taken over from center   */
+static int anchor_x = -1, anchor_y;/* pointer position when steering armed */
+#define STEER_ARM_PT 8             /* move this far (points) to take over  */
 static int frozen = 0;             /* byte_42CBF0 */
 static int step_once = 0;
 
@@ -187,7 +181,6 @@ static void load_config(const char *fname)
             cfg_detail_set = 1;
         }
         if (!strcmp(key, "fullscreen")) cfg_fullscreen = strcmp(val, "no") != 0;
-        if (!strcmp(key, "intro"))      cfg_intro = strcmp(val, "no") != 0;
     }
     fclose(f);
 }
@@ -406,14 +399,15 @@ static void generation_start(void)
     float fx, fy, half_qw;
     int   n;
 
-    /* sub_406440: poll the mouse; the original re-centers the cursor for
-     * the first 3 generations (SetCursorPos in sub_404630) */
-    if (cycles < 3) {
-        mouse_x = win_w >> 1;
-        mouse_y = win_h >> 1;
-    }
-    fx = -1.0f + 2.0f * (float)mouse_x / (float)win_w;
-    fy =  1.0f - 2.0f * (float)mouse_y / (float)win_h;
+    /* sub_406440: poll the mouse.  The original warped the cursor to the
+     * window center for the first 3 generations (SetCursorPos in
+     * sub_404630), so steering then began from center.  The web cannot warp
+     * the pointer, so the focus stays centered until the pointer is moved
+     * a few points after that (see motion()). */
+    fx = -1.0f + 2.0f * (float)(steer_live ? mouse_x : win_w >> 1)
+                      / (float)win_w;
+    fy =  1.0f - 2.0f * (float)(steer_live ? mouse_y : win_h >> 1)
+                      / (float)win_h;
     if (fx < -0.5f) fx = -0.5f; else if (fx > 0.5f) fx = 0.5f;
     if (fy < -0.5f) fy = -0.5f; else if (fy > 0.5f) fy = 0.5f;
     ima_set_focus(&ima, (int)((fx + 0.5f) * (float)hw),
@@ -427,14 +421,8 @@ static void generation_start(void)
     if (cycles > 9)                               /* row offsets from gen 11 */
         ima_update_row_offsets(&ima);
 
-    gen_boost = cfg_intro && cycles < INTRO_CYCLES;
-    if (gen_boost) {
-        rows_per_step = half_rows / INTRO_CHUNKS;
-        n = INTRO_CHUNKS + 1;      /* evolve chunks + one upload frame */
-    } else {
-        rows_per_step = 1 << (cfg_speed - 1);     /* 1,2,4,8,16 */
-        n = tiles_x * tiles_y + half_rows / rows_per_step;
-    }
+    rows_per_step = 1 << (cfg_speed - 1);         /* 1,2,4,8,16 */
+    n = tiles_x * tiles_y + half_rows / rows_per_step;
     zoomf = (float)pow(2.0, 1.0 / (double)n);
     if (n != frames_per_gen)
         build_hermite(n, zoomf);
@@ -553,16 +541,14 @@ static void zoomer_cycle(void)
      * gl4es swap emulation requires).  cur_row stays at the last chunk
      * during uploads so CHRONO pacing sees these as heavy frames. */
     if (upload_idx >= 0) {
-        do {
-            upload_tile(upload_idx % tiles_x, upload_idx / tiles_x);
-            /* the original draws a dummy point after each upload,
-             * forcing the driver to transfer the texture now */
-            glBegin(GL_POINTS);
-            glVertex3f(0.0f, 0.0f, 0.0f);
-            glEnd();
-        } while (gen_boost && ++upload_idx < tiles_x * tiles_y);
+        upload_tile(upload_idx % tiles_x, upload_idx / tiles_x);
+        /* the original draws a dummy point after each upload,
+         * forcing the driver to transfer the texture now */
+        glBegin(GL_POINTS);
+        glVertex3f(0.0f, 0.0f, 0.0f);
+        glEnd();
         draw_frame();
-        if (gen_boost || ++upload_idx >= tiles_x * tiles_y) {
+        if (++upload_idx >= tiles_x * tiles_y) {
             upload_idx = -1;
             cur_row = 0;
             frame_in_gen = 0;
@@ -627,6 +613,8 @@ static void zoomer_init(int first)
     upload_idx = -1;
     frame_in_gen = 0;
     tan_x1 = tan_y1 = 0.0f;
+    steer_live = 0;
+    anchor_x = -1;
     stat_frames = 0;
     stat_min = ~(Uint64)0;
     stat_max = 0;
@@ -724,10 +712,38 @@ static void idle(void)
 /* ========================================================================
  * input + menu (sub_404B10 / sub_4046E0)
  * ======================================================================== */
+/* drawable pixels per window point (motion coordinates are drawable px) */
+static float pixel_scale(void)
+{
+#ifdef __EMSCRIPTEN__
+    double cw = 0.0, ch = 0.0;
+    emscripten_get_element_css_size("#canvas", &cw, &ch);
+    return cw > 0.0 ? (float)win_w / (float)cw : 1.0f;
+#else
+    SDL_Window *w = SDL_GL_GetCurrentWindow();
+    int pw = 0, ph = 0;
+    if (w)
+        SDL_GetWindowSize(w, &pw, &ph);
+    return pw > 0 ? (float)win_w / (float)pw : 1.0f;
+#endif
+}
+
 static void motion(int x, int y)
 {
     mouse_x = x;
     mouse_y = y;
+    /* take over from center once the pointer moves STEER_ARM_PT from
+     * where it rested after the first 3 (centered) generations */
+    if (!steer_live && cycles >= 3) {
+        if (anchor_x < 0) {
+            anchor_x = x;
+            anchor_y = y;
+        } else {
+            int t = (int)(STEER_ARM_PT * pixel_scale() + 0.5f);
+            if (abs(x - anchor_x) >= t || abs(y - anchor_y) >= t)
+                steer_live = 1;
+        }
+    }
 }
 
 static void keyboard(unsigned char key, int x, int y)
@@ -900,9 +916,6 @@ int main(int argc, char **argv)
     frame_ticks = perf_freq / (Uint64)(cfg_rate > 0 ? cfg_rate : 60);
     /* sub_4063B0: vsync only for sync VBLANK, explicitly off otherwise */
     SDL_GL_SetSwapInterval(cfg_sync == 3 ? 1 : 0);
-
-    mouse_x = win_w / 2;
-    mouse_y = win_h / 2;
 
     init_gl();
     /* zoomer_init happens on the first display callback (auto_detail needs

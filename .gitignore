@@ -10,3 +10,6 @@ web/traveller.data
 
 # -dump N render-verification frames
 traveller_gen_*.bmp
+
+# local Claude Code preview config
+.claude/

@@ -71,8 +71,6 @@ detail LOW       # LOW 768x512 | MEDIUM 1024x768 | HIGH 1280x1024
                  # (ULTRA/ULTRA2: port extensions for retina drawables)
 xres 640         # window width: 640 | 800 | 1024
 fullscreen no
-intro yes        # port extension: compress the first ~10 near-black
-                 # generations while the seed grows to full screen
 ```
 
 If the config file does not set `detail`, the port auto-matches it to the
@@ -83,8 +81,8 @@ drawables select ULTRA (over ~1140 px tall) or ULTRA2 (over ~1700 px),
 port extensions beyond the original's three sizes (same 256x256 tile
 architecture).  Auto-selected detail also raises `speed` (unless set) to
 keep the original's ~2x zoom per 2.2 s cadence: MEDIUM/HIGH -> 3,
-ULTRA -> 4, ULTRA2 -> 5.  Set `detail LOW` + `speed 2` + `intro no` for
-the literal 1998 behavior.
+ULTRA -> 4, ULTRA2 -> 5.  Set `detail LOW` + `speed 2` for the literal
+1998 behavior.
 
 High-DPI note: rendering is at full device resolution on every target
 (SDL_WINDOW_ALLOW_HIGHDPI native, devicePixelRatio-scaled canvas backing
@@ -124,9 +122,11 @@ Both print identical per-generation CRC32s of the CA buffer (verified for
   the same paced frames natively, and the correct contract under the
   browser's requestAnimationFrame, where only one composite happens per
   callback no matter how many swaps are issued.
-- The original re-centered the Windows cursor during the first 3 generations;
-  this port pins the *stored* mouse position to center instead (no pointer
-  warping, which the web cannot do).
+- The original warped the Windows cursor to center during the first 3
+  generations, so steering began from center.  The web cannot warp the
+  pointer, so this port keeps the focus centered until, after those 3
+  generations, the pointer moves ~8 points from where it rests; from then on
+  the pointer position steers, as in the original.
 - The original was single-buffer capable (`doublebuffer no` + `glFinish`);
   this port always double-buffers.
 
