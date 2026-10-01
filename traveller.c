@@ -97,6 +97,11 @@ static int cfg_fullscreen = 0;
 static int cfg_detail_set = 0;
 static int cfg_speed_set  = 0;
 
+/* Portrait drawables (phones) run the CA with width and height swapped
+ * (port extension) rather than cropping a landscape CA to a narrow strip.
+ * Chosen once from the drawable shape at startup. */
+static int ca_portrait = 0;
+
 static unsigned int rng_seed;    /* ima this[16]: time(0) unless -seed     */
 static int opt_trial = 0;        /* original quit-after-101-cycles gate    */
 static int opt_dump = 0;         /* -dump N: BMP per generation, then quit */
@@ -578,14 +583,16 @@ static void zoomer_cycle(void)
 /* ========================================================================
  * (re)initialize CA + textures for the current detail level (sub_406090)
  * ======================================================================== */
+static const int ca_size[5][2] =   /* landscape {width, height} per detail */
+    { {768, 512}, {1024, 768}, {1280, 1024}, {2048, 1536}, {2560, 2048} };
+
 static void zoomer_init(int first)
 {
     /* LOW/MEDIUM/HIGH are the original's sizes; ULTRA is a port extension
      * (same 256-tile architecture) for retina-class drawables the original
      * never targeted. */
-    static const int ca_size[5][2] =
-        { {768, 512}, {1024, 768}, {1280, 1024}, {2048, 1536}, {2560, 2048} };
-    int cw = ca_size[cfg_detail][0], ch = ca_size[cfg_detail][1];
+    int cw = ca_size[cfg_detail][ca_portrait];
+    int ch = ca_size[cfg_detail][!ca_portrait];
 
     if (!first) {
         destroy_textures();
@@ -652,10 +659,10 @@ static void auto_detail(void)
     int dh = glutGet(GLUT_WINDOW_HEIGHT);
     if (dh <= 0)
         dh = win_h;
-    cfg_detail = (512 * 10 >= dh * 9)  ? 0
-               : (768 * 10 >= dh * 9)  ? 1
-               : (1024 * 10 >= dh * 9) ? 2
-               : (1536 * 10 >= dh * 9) ? 3 : 4;
+    /* smallest CA whose height is at least 90% of the drawable's */
+    for (cfg_detail = 0; cfg_detail < 4; cfg_detail++)
+        if (ca_size[cfg_detail][!ca_portrait] * 10 >= dh * 9)
+            break;
     if (!cfg_speed_set)
         cfg_speed = (cfg_detail == 0) ? 2
                   : (cfg_detail == 4) ? 5
@@ -665,6 +672,8 @@ static void auto_detail(void)
 static void display(void)
 {
     if (!zoomer_ready) {
+        int dw = glutGet(GLUT_WINDOW_WIDTH), dh = glutGet(GLUT_WINDOW_HEIGHT);
+        ca_portrait = dh > dw;
         if (!cfg_detail_set)
             auto_detail();
         zoomer_init(1);
@@ -743,6 +752,17 @@ static void motion(int x, int y)
             if (abs(x - anchor_x) >= t || abs(y - anchor_y) >= t)
                 steer_live = 1;
         }
+    }
+}
+
+/* a left press (or a touch, which SDL delivers as one) is a deliberate
+ * aim: steer there at once, without waiting for the STEER_ARM_PT move */
+static void mouse(int button, int state, int x, int y)
+{
+    if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN && cycles >= 3) {
+        mouse_x = x;
+        mouse_y = y;
+        steer_live = 1;
     }
 }
 
@@ -925,6 +945,7 @@ int main(int argc, char **argv)
     glutReshapeFunc(reshape);
     glutPassiveMotionFunc(motion);
     glutMotionFunc(motion);
+    glutMouseFunc(mouse);
     glutKeyboardFunc(keyboard);
     glutSpecialFunc(special);
     glutIdleFunc(idle);

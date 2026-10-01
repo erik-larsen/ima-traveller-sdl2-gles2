@@ -60,8 +60,8 @@ This matches the original's pace.
 
 | Input | Action |
 |-------|--------|
-| Mouse | Steer: the zoom travels toward the area under the cursor |
-| Right button | Menu: freeze, speed, steer, sync, rate, filter, detail, quit |
+| Mouse / touch | Steer: the zoom travels toward the area under the cursor or finger |
+| Right button | Menu: freeze, speed, steer, sync, rate, filter, detail, quit (not yet on touch devices) |
 | `F1` / `p` | Freeze |
 | `F4` / `s` | Single step while frozen |
 | `ESC` | Quit (native: prints the original's cycle/fps stats) |
@@ -148,12 +148,15 @@ lagged-Fibonacci RNG.  Pixels are 15-bit `(H<<10)|(S<<5)|V`.
 - **Steering start**: the original warped the Windows cursor to the center
   for the first 3 generations, so steering began from center.  Browsers
   cannot warp the pointer, so the port keeps the focus centered until, after
-  those 3 generations, the pointer moves ~8 points from where it rests.  From
-  then on every pointer movement steers, as in the original.
+  those 3 generations, the pointer moves ~8 points from where it rests, or
+  the viewer clicks or touches.  From then on every pointer movement steers,
+  as in the original.
+- **Portrait screens** (phones) run the CA with width and height swapped,
+  e.g. 1536x2048, instead of cropping a landscape CA to a narrow strip.
 - **Buffering**: the original could run single-buffered (`doublebuffer no` +
   `glFinish`); this port always double-buffers.
 - **Extensions**: the ULTRA/ULTRA2 detail levels, speed 5, auto-matched
-  detail, and the command-line options above.
+  detail, portrait CA, touch steering, and the command-line options above.
 
 ### Verification
 
