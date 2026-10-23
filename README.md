@@ -36,6 +36,7 @@ external trees can be swapped in.
 make            # native -> ./bin-<os>-<arch>/traveller
 make browser    # web    -> ./web/traveller.js + traveller.wasm
 make selftest   # headless CA core check (see Verification)
+make pages      # rebuild web and publish it to GitHub Pages (gh-pages)
 make clean
 ```
 
@@ -56,7 +57,8 @@ Or serve `web/` with any static server, e.g.
 
 The hosted build is the `gh-pages` branch: `web/traveller.html` as
 `index.html`, plus `traveller.js`, `traveller.wasm` and the dependency
-licenses.
+licenses.  `make pages` rebuilds and republishes it (see `web/pages.sh`);
+it commits only when the build changed.
 
 The journey starts from a 4-pixel seed, so the first ~40 seconds are nearly
 black while the pixels split and the structure grows to fill the screen.

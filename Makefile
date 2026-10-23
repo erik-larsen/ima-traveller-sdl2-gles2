@@ -146,8 +146,12 @@ $(EM_OUT): $(SRC) ima_core.h | $(WEB_DIR)
 run-browser: browser
 	emrun $(WEB_PAGE)
 
+# ---- GitHub Pages: rebuild, then publish web/ to the gh-pages branch ----
+pages: browser
+	./web/pages.sh
+
 clean:
 	rm -rf $(BIN_DIR)
 	rm -f $(WEB_DIR)/$(APPNAME).js $(WEB_DIR)/$(APPNAME).wasm $(WEB_DIR)/$(APPNAME).data
 
-.PHONY: all native browser selftest run run-browser clean
+.PHONY: all native browser selftest run run-browser pages clean
