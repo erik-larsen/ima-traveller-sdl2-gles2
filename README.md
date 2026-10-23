@@ -2,7 +2,9 @@
 
 > Published with the permission of Erwin Driessens.
 
-![IMA Traveller running in the browser](screenshot.jpg)
+**Run it in your browser: https://erik-larsen.github.io/ima-traveller-sdl2-gles2/**
+
+[![IMA Traveller running in the browser](screenshot.jpg)](https://erik-larsen.github.io/ima-traveller-sdl2-gles2/)
 
 ## Intro
 
@@ -51,6 +53,10 @@ make run-browser    # web, via emrun
 
 Or serve `web/` with any static server, e.g.
 `python3 -m http.server --directory web`, and open `traveller.html`.
+
+The hosted build is the `gh-pages` branch: `web/traveller.html` as
+`index.html`, plus `traveller.js`, `traveller.wasm` and the dependency
+licenses.
 
 The journey starts from a 4-pixel seed, so the first ~40 seconds are nearly
 black while the pixels split and the structure grows to fill the screen.
