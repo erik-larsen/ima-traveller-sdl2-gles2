@@ -6,8 +6,8 @@
  * the palette maps them to RGBA5551 texels exactly like the original.
  * Function comments reference the original's addresses (sub_XXXXXX).
  *
- * Bit-exact with the Python reference (ima-traveller/ima_traveller_final.py):
- * same seed + same focus => identical buffers, verified by CRC32.
+ * Deterministic: same seed + same focus => identical buffers.  `make
+ * selftest` checks per-generation CRC32s against selftest.expected.
  */
 #ifndef IMA_CORE_H
 #define IMA_CORE_H

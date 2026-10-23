@@ -5,8 +5,8 @@
  *
  * Reverse engineered from the original Windows 98 + OpenGL executable via
  * Ghidra/Hex-Rays decompilation; function comments reference the original's
- * addresses (sub_XXXXXX).  The CA core lives in ima_core.c and is bit-exact
- * with the Python reference (ima-traveller repo).
+ * addresses (sub_XXXXXX).  The CA core lives in ima_core.c (checked by
+ * `make selftest`).
  *
  * The renderer reproduces the original's immediate-mode OpenGL scheme:
  *   - the CA image is palette-converted to RGBA5551 and tiled into a grid of

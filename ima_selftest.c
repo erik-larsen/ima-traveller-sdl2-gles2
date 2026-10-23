@@ -1,12 +1,12 @@
-/* ima_selftest.c -- headless cross-verification harness for ima_core.
+/* ima_selftest.c -- headless regression harness for ima_core.
  *
  * Prints a CRC32 (zlib-compatible) of the CA buffer after each generation,
- * in the same format as the Python reference:
+ * driving the engine exactly as the zoomer does with the focus centered:
  *
- *     python3 ima_traveller_final.py --seed 12345 --frames 12 --checksums
- *     cc -O2 ima_core.c ima_selftest.c -o ima_selftest && ./ima_selftest 12345 12
+ *     ./ima_selftest [seed [generations [width height]]]
  *
- * The outputs must match line for line.
+ * `make selftest` compares the output for two CA sizes against
+ * selftest.expected, recorded from this engine.
  */
 #include <stdio.h>
 #include <stdlib.h>

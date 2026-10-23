@@ -113,9 +113,11 @@ after N (headless render verification).
 |------|----------|
 | `ima_core.c/h` | The CA engine: RNG, mutation table, breeding rules, palette. Pure C, no GL. |
 | `traveller.c` | The "zoomer": GLUT app reproducing the original's immediate-mode renderer. |
-| `ima_selftest.c` | Headless checksum harness (see Verification). |
+| `ima_selftest.c`, `selftest.expected` | Headless checksum regression test (see Verification). |
+| `python/` | The earlier Python reference implementation and a Shadertoy version (see [python/README.md](python/README.md)). |
 | `Makefile` | Native + Emscripten build, modeled on newave.mk in freeglut-sdl2-ogles2. |
 | `web/traveller.html` | Hand-maintained page that loads `web/traveller.js`. |
+| `web/pages.sh` | Publishes the web build to the `gh-pages` branch (`make pages`). |
 
 ### The cellular automaton
 
@@ -186,29 +188,32 @@ of the work.  No source code was available.
    Opus: working through the decompiled routines, it identified the HSV555
    pixel format, the per-child neighbor selection, the 16x16 mutation table,
    the row-offset cycling and the lagged-Fibonacci RNG.  These became a
-   Python reference implementation.
+   Python reference implementation, kept in [python/](python/).
    This analysis also showed that the zoom is the automaton itself: each
    generation is a 2x enlargement of part of the previous one.
 3. **The port.**  The C engine in `ima_core.c` was written from the
-   decompiled code and checked bit for bit against the Python reference
-   (see Verification).  `traveller.c` reproduces the original's renderer
+   decompiled code.  Going back over the decompiled routines corrected
+   several details of the Python version (seeding, RNG initialization and
+   stepping, the hue channel's comparison, row-offset timing); see
+   [python/README.md](python/README.md).  `traveller.c` reproduces the
+   original's renderer
    call for call, then adapts it to GLUT/SDL2 and OpenGL ES 2 (via gl4es),
    which lets the same code compile for desktops and, through Emscripten,
    for the web.  Claude Code helped with the port and its testing.
 
 ### Verification
 
-The CA core is **bit-exact** with the Python reference implementation
-(`ima-traveller` repo, `ima_traveller_final.py`):
+`make selftest` runs the CA engine headless (no GL) for 40 generations at
+768x512 and at 1024x768, driven as the zoomer drives it with the focus
+centered, and compares a CRC32 of the CA buffer after every generation with
+`selftest.expected`.  This is a regression test: the expected values were
+recorded from this engine, whose routines were checked against the
+decompiled code.  After an intentional change to `ima_core.c`, re-record
+them with `make selftest SELFTEST_UPDATE=1`.
 
-```sh
-make selftest
-# vs.
-python3 ima_traveller_final.py --seed 12345 --frames 12 --checksums
-```
-
-Both print identical per-generation CRC32s of the CA buffer (verified for
-768x512 and 1024x768, 40+ generations).
+The earlier Python version in `python/` produces the same kind of imagery
+but not the same pixels, because the C engine corrects several of its
+details.
 
 ## Credits
 

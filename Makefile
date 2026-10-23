@@ -123,11 +123,21 @@ run: native
 	DYLD_FALLBACK_LIBRARY_PATH=$(GLES_LIBS_PATH) \
 	LD_LIBRARY_PATH=$(GLES_LIBS_PATH) $(APP)
 
-# ---- headless CA core self-test (no GL; compare with the Python reference:
-# python3 ima_traveller_final.py --seed 12345 --frames 12 --checksums) ----
+# ---- headless CA core regression test (no GL): per-generation CRC32s of
+# the CA buffer must match selftest.expected, recorded from this engine.
+# After an intentional change to ima_core.c, regenerate with
+#   make selftest SELFTEST_UPDATE=1 ----
+SELFTEST_RUN = $(BIN_DIR)/ima_selftest 12345 40 768 512; \
+               $(BIN_DIR)/ima_selftest 12345 40 1024 768
 selftest: | $(BIN_DIR)
 	$(CC) -O2 $(WARN) ima_core.c ima_selftest.c -o $(BIN_DIR)/ima_selftest
-	$(BIN_DIR)/ima_selftest 12345 12
+ifdef SELFTEST_UPDATE
+	{ $(SELFTEST_RUN); } > selftest.expected
+	@echo "selftest: recorded selftest.expected"
+else
+	{ $(SELFTEST_RUN); } | diff -u selftest.expected - \
+		&& echo "selftest: PASS (82 generations match selftest.expected)"
+endif
 
 # ---- emscripten ----
 # emcc emits traveller.js/.wasm ONLY -- never traveller.html -- so the

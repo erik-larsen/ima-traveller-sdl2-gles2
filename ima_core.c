@@ -1,5 +1,5 @@
-/* ima_core.c -- IMA cellular automata engine, bit-exact port of the
- * decompiled "traveller 2.0c" core (see ima_core.h). */
+/* ima_core.c -- IMA cellular automata engine, a port of the decompiled
+ * "traveller 2.0c" core (see ima_core.h). */
 
 #include <stdlib.h>
 #include <string.h>
