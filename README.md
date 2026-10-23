@@ -1,7 +1,6 @@
 # IMA Traveller
 
-> **This repo remains private unless the original authors give permission to
-> publish it.**
+> Published with the permission of Erwin Driessens.
 
 ![IMA Traveller running in the browser](screenshot.jpg)
 
@@ -15,11 +14,12 @@ is twice the resolution of the last.  The infinite zoom is the automaton
 itself.  Moving the cursor steers the journey toward the area beneath it.
 
 This is a port of the original Windows 98 + OpenGL executable, reverse
-engineered through Ghidra decompilation and AI-assisted analysis (Claude).  The
-same C source builds natively for Mac, Windows and Linux, and for the browser
-via Emscripten/WebAssembly.  It reproduces the original's cellular automaton
-bit for bit and follows its renderer closely; source comments reference the
-original's function addresses (`sub_XXXXXX`).
+engineered through Ghidra decompilation and AI-assisted analysis (Claude); see
+[Reverse engineering](#reverse-engineering).  The same C source builds
+natively for Mac, Windows and Linux, and for the browser via
+Emscripten/WebAssembly.  It follows the decompiled cellular automaton exactly
+and the renderer closely; source comments reference the original's function
+addresses (`sub_XXXXXX`).
 
 ## Build
 
@@ -66,20 +66,23 @@ This matches the original's pace.
 | `F4` / `s` | Single step while frozen |
 | `ESC` | Quit (native: prints the original's cycle/fps stats) |
 
-**Config**: `traveller.config` in the working directory uses the same keys
-and defaults as the original:
+**Config**: `traveller.config` in the working directory uses the original's
+keys and values, matched without regard to case, so the original's own
+config files work unchanged (`DoubleBuffer` and `Menu` are ignored).
+Defaults are the original's, except that steering is CURVED and sync is
+VBLANK, as Erwin Driessens recommends:
 
 ```
-speed 2          # 1..4 -> 1/2/4/8 CA rows per frame (5 = 16: port extension)
-rate 60          # target fps for sync CLOCK
-steer LINEAR     # LINEAR | CURVED (Hermite-interpolated pan)
-sync CLOCK       # FREE | CLOCK | CHRONO | VBLANK
-filter NEAREST   # NEAREST | LINEAR texture filtering
-detail LOW       # LOW 768x512 | MEDIUM 1024x768 | HIGH 1280x1024
+Speed 2          # 1..4 -> 1/2/4/8 CA rows per frame (5 = 16: port extension)
+Rate 60          # target fps for Sync CLOCK
+Steer CURVED     # LINEAR | CURVED (Hermite-interpolated pan)
+Sync VBLANK      # NONE | CLOCK | CHRONO | VBLANK
+Filter NEAREST   # NEAREST | LINEAR texture filtering
+Detail LOW       # LOW 768x512 | MEDIUM 1024x768 | HIGH 1280x1024
                  # | ULTRA 2048x1536 | ULTRA2 2560x2048
                  # (ULTRA/ULTRA2: port extensions for retina drawables)
-xres 640         # window width: 640 | 800 | 1024
-fullscreen no
+XRes 640         # window width: 640 | 800 | 1024
+FullScreen NO
 ```
 
 If `detail` is not set, the port matches it to the drawable height at
@@ -88,8 +91,8 @@ window/CA pairings.  Without this, large modern windows turn blocky long
 before each generation's refinement arrives.  Retina-class drawables select
 ULTRA (over ~1140 px tall) or ULTRA2 (over ~1700 px).  Auto-selected detail
 also raises `speed` (unless set) to keep the original's ~2x zoom per 2.2 s:
-MEDIUM/HIGH -> 3, ULTRA -> 4, ULTRA2 -> 5.  Set `detail LOW` and `speed 2`
-for the literal 1998 behavior.
+MEDIUM/HIGH -> 3, ULTRA -> 4, ULTRA2 -> 5.  Set `Detail LOW`, `Speed 2`,
+`Steer LINEAR` and `Sync CLOCK` for the literal 1998 defaults.
 
 **Command line** (port extensions): `-seed N` fixes the RNG seed (default
 `time(0)`, like the original); `-trial` quits after 101 generations, as the
@@ -137,8 +140,9 @@ lagged-Fibonacci RNG.  Pixels are 15-bit `(H<<10)|(S<<5)|V`.
 ### Differences from the original
 
 - **Timing** uses `SDL_GetPerformanceCounter` (the original used
-  `QueryPerformanceCounter`).  On the web the busy-wait pacing is skipped and
-  requestAnimationFrame provides ~60 Hz.
+  `QueryPerformanceCounter`).  On the web every sync mode is paced by
+  requestAnimationFrame (the display's refresh, i.e. VBLANK); the busy-wait
+  pacing of CLOCK and CHRONO is skipped there.
 - **Tile uploads**: the original ran the generation-end uploads in one
   message-loop iteration with one real buffer swap per tile.  This port runs
   each upload as its own display callback (exactly one `glutSwapBuffers` per
@@ -158,6 +162,34 @@ lagged-Fibonacci RNG.  Pixels are 15-bit `(H<<10)|(S<<5)|V`.
 - **Extensions**: the ULTRA/ULTRA2 detail levels, speed 5, auto-matched
   detail, portrait CA, touch steering, and the command-line options above.
 
+### Reverse engineering
+
+The starting point was the original `traveller20c.exe` (traveller 2.0c),
+its `traveller.config` and readme, and the artists' published descriptions
+of the work.  No source code was available.
+
+1. **Decompilation.**  Ghidra translated the executable's x86 machine code
+   into C-like pseudocode (Hex-Rays was also used; the source comments keep
+   its `sub_XXXXXX` function names).  The Windows and OpenGL side read
+   fairly directly from this: window and menu setup, the config parser, the
+   256x256 texture tiles, the zoom quad and frame pacing.
+2. **The cellular automaton.**  The decompiled CA routines are dense integer
+   code with no names or types, and early attempts to reconstruct them, by
+   hand and with AI assistants, produced programs that ran but did not
+   behave like the original.  The breakthrough came in early 2026 with Claude
+   Opus: working through the decompiled routines, it identified the HSV555
+   pixel format, the per-child neighbor selection, the 16x16 mutation table,
+   the row-offset cycling and the lagged-Fibonacci RNG.  These became a
+   Python reference implementation.
+   This analysis also showed that the zoom is the automaton itself: each
+   generation is a 2x enlargement of part of the previous one.
+3. **The port.**  The C engine in `ima_core.c` was written from the
+   decompiled code and checked bit for bit against the Python reference
+   (see Verification).  `traveller.c` reproduces the original's renderer
+   call for call, then adapts it to GLUT/SDL2 and OpenGL ES 2 (via gl4es),
+   which lets the same code compile for desktops and, through Emscripten,
+   for the web.  Claude Code helped with the port and its testing.
+
 ### Verification
 
 The CA core is **bit-exact** with the Python reference implementation
@@ -176,8 +208,9 @@ Both print identical per-generation CRC32s of the CA buffer (verified for
 
 **IMA Traveller** (traveller 2.0c, 1996) is an artwork by
 [Erwin Driessens & Maria Verstappen](https://www.driessensverstappen.nl/expanding-structures/ima-traveller/ima-traveller.html).
-All rights in the original work remain with the artists.  This is an
-unofficial, non-commercial port; the original executable is not included.
+All rights in the original work remain with the artists.  This
+non-commercial port is published with Erwin Driessens's permission; the
+original executable is not included.
 
 Port by [Erik Larsen](https://github.com/erik-larsen).
 

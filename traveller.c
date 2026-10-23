@@ -19,11 +19,13 @@
  *     and at generation end the new image is uploaded one tile per frame
  *     (sub_4065C0), keeping the animation smooth on 1998 hardware
  *
- * Config file "traveller.config" (same keys/defaults as the original):
+ * Config file "traveller.config" (the original's keys, matched without
+ * regard to case; defaults as the original's except steer and sync, which
+ * follow the artists' recommendation):
  *     speed 2          # 1..4 -> 1/2/4/8 CA rows per frame (5 = 16: port ext.)
  *     rate 60          # target fps for sync clock
- *     steer LINEAR     # LINEAR | CURVED (Hermite pan)
- *     sync CLOCK       # FREE | CLOCK | CHRONO | VBLANK
+ *     steer CURVED     # LINEAR | CURVED (Hermite pan)
+ *     sync VBLANK      # NONE | CLOCK | CHRONO | VBLANK
  *     filter NEAREST   # NEAREST | LINEAR
  *     detail LOW       # LOW (768x512) | MEDIUM (1024x768) | HIGH (1280x1024)
  *                      # | ULTRA (2048x1536) | ULTRA2 (2560x2048) (port ext.)
@@ -44,6 +46,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <math.h>
 #include <time.h>
 #include <GL/glut.h>
@@ -77,11 +80,12 @@
 #define MAX_TILES (10 * 8) /* detail ULTRA2 (port extension): 10x8 tiles  */
 #define MAX_GRID  ((10 + 1) * (8 + 1))
 
-/* ---- configuration (dword_42CD40..: defaults from WinMain) ------------- */
+/* ---- configuration (dword_42CD40..: defaults from WinMain, except steer
+ * and sync: CURVED + VBLANK, as recommended by Erwin Driessens) ---------- */
 static int cfg_speed      = 2;   /* 1..4                                   */
 static int cfg_rate       = 60;  /* fps for sync CLOCK                     */
-static int cfg_steer      = 1;   /* 1 = LINEAR, 2 = CURVED (Hermite)       */
-static int cfg_sync       = 1;   /* 0 FREE, 1 CLOCK, 2 CHRONO, 3 VBLANK    */
+static int cfg_steer      = 2;   /* 1 = LINEAR, 2 = CURVED (Hermite)       */
+static int cfg_sync       = 3;   /* 0 FREE, 1 CLOCK, 2 CHRONO, 3 VBLANK    */
 static int cfg_filter     = 1;   /* 1 = NEAREST, 2 = LINEAR                */
 static int cfg_detail     = 0;   /* 0 LOW, 1 MEDIUM, 2 HIGH                */
 static int cfg_xres       = 640;
@@ -156,8 +160,20 @@ static int frozen = 0;             /* byte_42CBF0 */
 static int step_once = 0;
 
 /* ========================================================================
- * config file (sub_405390); same keys as the original "traveller.config"
+ * config file (sub_405390); same keys as the original "traveller.config".
+ * The original compared case-sensitively against "Speed", "Steer", "CURVED",
+ * ...; matching without case accepts its files and lowercase ones alike.
+ * Keys the port does not use (DoubleBuffer, Menu) are ignored.
  * ======================================================================== */
+static int eq(const char *a, const char *b)   /* case-insensitive strcmp == 0 */
+{
+    while (*a && tolower((unsigned char)*a) == tolower((unsigned char)*b)) {
+        a++;
+        b++;
+    }
+    return tolower((unsigned char)*a) == tolower((unsigned char)*b);
+}
+
 static void load_config(const char *fname)
 {
     char line[192], key[64], val[64];
@@ -169,23 +185,23 @@ static void load_config(const char *fname)
             continue;
         if (sscanf(line, "%63s %63s", key, val) != 2)
             continue;
-        if (!strcmp(key, "speed")) { cfg_speed = atoi(val); cfg_speed_set = 1; }
-        if (!strcmp(key, "rate"))   cfg_rate = atoi(val);
-        if (!strcmp(key, "steer"))  cfg_steer = !strcmp(val, "CURVED") ? 2 : 1;
-        if (!strcmp(key, "sync"))
-            cfg_sync = !strcmp(val, "CHRONO") ? 2
-                     : !strcmp(val, "CLOCK")  ? 1
-                     : !strcmp(val, "VBLANK") ? 3 : 0;
-        if (!strcmp(key, "filter")) cfg_filter = !strcmp(val, "LINEAR") ? 2 : 1;
-        if (!strcmp(key, "xres"))   cfg_xres = atoi(val);
-        if (!strcmp(key, "detail")) {
-            cfg_detail = !strcmp(val, "MEDIUM") ? 1
-                       : !strcmp(val, "HIGH")   ? 2
-                       : !strcmp(val, "ULTRA")  ? 3
-                       : !strcmp(val, "ULTRA2") ? 4 : 0;
+        if (eq(key, "speed")) { cfg_speed = atoi(val); cfg_speed_set = 1; }
+        if (eq(key, "rate"))   cfg_rate = atoi(val);
+        if (eq(key, "steer"))  cfg_steer = eq(val, "CURVED") ? 2 : 1;
+        if (eq(key, "sync"))   /* anything else (NONE, FREE) = free running */
+            cfg_sync = eq(val, "CHRONO") ? 2
+                     : eq(val, "CLOCK")  ? 1
+                     : eq(val, "VBLANK") ? 3 : 0;
+        if (eq(key, "filter")) cfg_filter = eq(val, "LINEAR") ? 2 : 1;
+        if (eq(key, "xres"))   cfg_xres = atoi(val);
+        if (eq(key, "detail")) {
+            cfg_detail = eq(val, "MEDIUM") ? 1
+                       : eq(val, "HIGH")   ? 2
+                       : eq(val, "ULTRA")  ? 3
+                       : eq(val, "ULTRA2") ? 4 : 0;
             cfg_detail_set = 1;
         }
-        if (!strcmp(key, "fullscreen")) cfg_fullscreen = strcmp(val, "no") != 0;
+        if (eq(key, "fullscreen")) cfg_fullscreen = !eq(val, "no");
     }
     fclose(f);
 }
@@ -814,10 +830,25 @@ enum {
     M_QUIT
 };
 
+/* sub_4063B0: vsync on for VBLANK only, explicitly off otherwise (CLOCK's
+ * busy-wait pacing + vsync would halve the frame rate).  On the web the
+ * browser's requestAnimationFrame is the only sensible pacing: swap
+ * interval 0 there switches Emscripten's main loop to an unpaced
+ * setTimeout loop, so leave it alone. */
+static void set_vsync(int on)
+{
+#ifdef __EMSCRIPTEN__
+    (void)on;
+#else
+    SDL_GL_SetSwapInterval(on);
+#endif
+}
+
 static void apply_rate(int rate)
 {
     cfg_rate = rate;
     cfg_sync = 1;
+    set_vsync(0);
     frame_ticks = perf_freq / (Uint64)cfg_rate;
 }
 
@@ -837,16 +868,10 @@ static void menu(int item)
     case M_SPEED_UP:     set_speed(cfg_speed + 1);     break;
     case M_STEER_LINEAR: cfg_steer = 1;                break;
     case M_STEER_CURVED: cfg_steer = 2;                break;
-    /* sub_4063B0: vsync on for VBLANK only, explicitly off otherwise
-     * (CLOCK's busy-wait pacing + vsync would halve the frame rate) */
-    case M_SYNC_FREE:    cfg_sync = 0;
-                         SDL_GL_SetSwapInterval(0);    break;
-    case M_SYNC_CLOCK:   cfg_sync = 1;
-                         SDL_GL_SetSwapInterval(0);    break;
-    case M_SYNC_CHRONO:  cfg_sync = 2;
-                         SDL_GL_SetSwapInterval(0);    break;
-    case M_SYNC_VBLANK:  cfg_sync = 3;
-                         SDL_GL_SetSwapInterval(1);    break;
+    case M_SYNC_FREE:    cfg_sync = 0; set_vsync(0);   break;
+    case M_SYNC_CLOCK:   cfg_sync = 1; set_vsync(0);   break;
+    case M_SYNC_CHRONO:  cfg_sync = 2; set_vsync(0);   break;
+    case M_SYNC_VBLANK:  cfg_sync = 3; set_vsync(1);   break;
     case M_RATE_40:      apply_rate(40);               break;
     case M_RATE_60:      apply_rate(60);               break;
     case M_RATE_80:      apply_rate(80);               break;
@@ -934,8 +959,7 @@ int main(int argc, char **argv)
 
     perf_freq = SDL_GetPerformanceFrequency();
     frame_ticks = perf_freq / (Uint64)(cfg_rate > 0 ? cfg_rate : 60);
-    /* sub_4063B0: vsync only for sync VBLANK, explicitly off otherwise */
-    SDL_GL_SetSwapInterval(cfg_sync == 3 ? 1 : 0);
+    set_vsync(cfg_sync == 3);
 
     init_gl();
     /* zoomer_init happens on the first display callback (auto_detail needs
