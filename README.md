@@ -1,15 +1,13 @@
-# IMA Traveller
+# [IMA Traveller](https://erik-larsen.github.io/ima-traveller-sdl2-gles2/)
 
-> Published with the permission of Erwin Driessens.
-
-**Run it in your browser: https://erik-larsen.github.io/ima-traveller-sdl2-gles2/**
+*Published with the permission of Erwin Driessens.*
 
 [![IMA Traveller running in the browser](screenshot.jpg)](https://erik-larsen.github.io/ima-traveller-sdl2-gles2/)
 
 ## Intro
 
-**IMA Traveller** (traveller 2.0c, 1996) is an artwork by Erwin Driessens &
-Maria Verstappen: a cellular automaton that zooms endlessly into evolving,
+**IMA Traveller** (traveller 2.0c, 1996) is an [artwork by Erwin Driessens &
+Maria Verstappen](https://www.driessensverstappen.nl/expanding-structures/ima-traveller/ima-traveller.html): a cellular automaton that zooms endlessly into evolving,
 organic pixel structures.  Every pixel splits into four children that
 inherit color from their neighbors with slight mutation, so each generation
 is twice the resolution of the last.  The infinite zoom is the automaton
